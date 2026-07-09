@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServiceQuoteFromCart } from '@/lib/fleetbase/storefront';
+import { getServiceQuoteFromCart } from '@/lib/provider';
 
 export async function POST(request: Request) {
   try {

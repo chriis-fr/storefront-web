@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { captureCheckout } from '@/lib/fleetbase/storefront';
+import { captureCheckout } from '@/lib/provider';
 import { runAfterOrderPlacedHooks, runBeforeCheckoutCaptureHooks } from '@/plugins/registry';
 
 export async function POST(request: Request) {

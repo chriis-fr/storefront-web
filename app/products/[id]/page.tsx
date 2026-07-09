@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ProductDetail } from '@/components/catalog/product-detail';
-import { getProduct } from '@/lib/fleetbase/storefront';
+import { getProduct } from '@/lib/provider';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;

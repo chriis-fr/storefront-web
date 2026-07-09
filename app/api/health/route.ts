@@ -6,10 +6,10 @@ export async function GET() {
 
   return NextResponse.json(
     {
-      ok: env.ok,
+      ok:      env.ok,
       service: 'storefront-web',
+      mode:    env.mode,
       missing: env.missing,
-      fleetbaseHost: env.values.FLEETBASE_HOST
     },
     { status: env.ok ? 200 : 503 }
   );

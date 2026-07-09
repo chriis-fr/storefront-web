@@ -1,6 +1,7 @@
 import { cookies, headers } from 'next/headers';
 import { requireEnv } from '@/lib/config';
 import { parseJsonResponse } from '@/lib/http';
+import { FLEETBASE_ENABLED } from '@/lib/runtime';
 
 type FleetbaseRequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -33,6 +34,9 @@ async function getLocale() {
 }
 
 export async function storefrontRequest<T>(path: string, options: FleetbaseRequestOptions = {}): Promise<T> {
+  if (!FLEETBASE_ENABLED) {
+    throw new Error('Fleetbase is not enabled on this instance (FLEETBASE_ENABLED=false)');
+  }
   const method = options.method ?? 'GET';
   const customerToken = options.customerToken === undefined ? await getCustomerTokenFromCookies() : options.customerToken;
   const requestHeaders: Record<string, string> = {

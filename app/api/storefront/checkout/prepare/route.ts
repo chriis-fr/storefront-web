@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { beforeCheckout } from '@/lib/fleetbase/storefront';
+import { beforeCheckout } from '@/lib/provider';
 
 export async function POST(request: Request) {
   try {

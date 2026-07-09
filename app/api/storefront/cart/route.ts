@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { getCart } from '@/lib/fleetbase/storefront';
+import { getCart } from '@/lib/provider';
 import { sessionCookieOptions } from '@/lib/runtime';
 
 export async function GET() {

@@ -1,5 +1,5 @@
 import { ProductGrid } from '@/components/catalog/product-grid';
-import { searchProducts } from '@/lib/fleetbase/storefront';
+import { searchProducts } from '@/lib/provider';
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string }> }) {
   const params = await searchParams;

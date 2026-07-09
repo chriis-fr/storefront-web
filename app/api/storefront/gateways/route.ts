@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getGateways } from '@/lib/fleetbase/storefront';
+import { getGateways } from '@/lib/provider';
 
 export async function GET() {
   try {

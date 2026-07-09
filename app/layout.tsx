@@ -4,14 +4,14 @@ import config from '@/storefront.config';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { ThemeScript } from '@/components/theme-script';
-import { getStorefrontAbout } from '@/lib/fleetbase/storefront';
+import { getStorefrontAbout } from '@/lib/provider';
 import { getThemeCssVariables } from '@/lib/theme';
 import { PluginProvider } from '@/plugins/provider';
 
 export async function generateMetadata(): Promise<Metadata> {
   const about = await getStorefrontAbout().catch(() => null);
   const title = about?.name ?? config.name;
-  const description = about?.description ?? 'A Fleetbase powered storefront.';
+  const description = about?.description ?? 'Order online from your favourite local store.';
 
   return {
     title: {
@@ -30,7 +30,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const about = await getStorefrontAbout().catch(() => null);
-  const themeCss = getThemeCssVariables(config.defaultTheme);
+  const brandColor = typeof about?.options?.brandColor === 'string' ? about.options.brandColor : null;
+  const themeCss = {
+    ...getThemeCssVariables(config.defaultTheme),
+    ...(brandColor ? { '--primary': brandColor } : {}),
+  } as React.CSSProperties;
 
   return (
     <html lang={config.defaultLocale}>

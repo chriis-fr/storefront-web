@@ -7,10 +7,26 @@ function imageHosts() {
       .filter(Boolean)
   );
 
-  try {
-    hosts.add(new URL(process.env.FLEETBASE_HOST ?? 'https://api.fleetbase.io').hostname);
-  } catch {
-    hosts.add('api.fleetbase.io');
+  // Fleetbase mode — allow images from the Fleetbase host
+  if (process.env.FLEETBASE_HOST) {
+    try {
+      hosts.add(new URL(process.env.FLEETBASE_HOST).hostname);
+    } catch {
+      hosts.add('api.fleetbase.io');
+    }
+  }
+
+  // Chains mode — allow images from the chains-api host
+  if (process.env.CHAINS_API_URL) {
+    try {
+      hosts.add(new URL(process.env.CHAINS_API_URL).hostname);
+    } catch {}
+  }
+  // Also allow the public-facing API base URL (may differ from internal CHAINS_API_URL)
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    try {
+      hosts.add(new URL(process.env.NEXT_PUBLIC_API_BASE_URL).hostname);
+    } catch {}
   }
 
   if (process.env.NODE_ENV !== 'production') {
@@ -31,7 +47,7 @@ const nextConfig = {
     ignoreDuringBuilds: true
   },
   images: {
-    remotePatterns: imageHosts()
+    remotePatterns: imageHosts(),
   }
 };
 

@@ -4,7 +4,7 @@ import { ProductGrid } from '@/components/catalog/product-grid';
 import { StoreHero } from '@/components/store-hero';
 import { CategoryPills } from '@/components/catalog/category-pills';
 import { StoreDirectory } from '@/components/catalog/store-directory';
-import { getCategories, getNetworkStores, getProducts, getStorefrontAbout } from '@/lib/fleetbase/storefront';
+import { getCategories, getNetworkStores, getProducts, getStorefrontAbout } from '@/lib/provider';
 
 export default async function HomePage() {
   const [about, categories, products, networkStores] = await Promise.all([

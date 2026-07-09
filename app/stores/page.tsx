@@ -1,5 +1,5 @@
 import { StoreDirectory } from '@/components/catalog/store-directory';
-import { getNetworkStores, getStorefrontAbout } from '@/lib/fleetbase/storefront';
+import { getNetworkStores, getStorefrontAbout } from '@/lib/provider';
 
 export default async function StoresPage() {
   const [about, stores] = await Promise.all([
