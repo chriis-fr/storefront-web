@@ -1,4 +1,7 @@
 export const ONE_MONTH_SECONDS = 60 * 60 * 24 * 30;
+// Long-lived session so customers stay signed in like a normal storefront
+// (Carrefour-style) — matches the 365d JWT issued by chains-api.
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 // Read once at module load — never re-checked per request.
 // Set FLEETBASE_ENABLED=true on a storefront deployment to activate
@@ -25,7 +28,7 @@ export function sessionCookieOptions(env: RuntimeEnv = process.env): CookieOptio
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: ONE_MONTH_SECONDS,
+    maxAge: SESSION_MAX_AGE_SECONDS,
     secure: isProduction(env)
   };
 }

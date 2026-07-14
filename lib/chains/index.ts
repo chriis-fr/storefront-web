@@ -14,6 +14,8 @@ import type {
   PaymentGateway,
   ServiceQuote,
   Customer,
+  CategoryNode,
+  ProductPage,
 } from '@/lib/types';
 import type { ChainsMenuItem, ChainsStoreInfo } from '@/lib/storefront-provider';
 import { chainsGet, chainsPost, chainsPut, chainsDelete, chainsPatch } from './client';
@@ -59,33 +61,97 @@ export async function getChainsAbout(): Promise<StorefrontAbout> {
 
 // ─── Menu items (→ StorefrontProduct[]) ──────────────────────────────────────
 
-export async function getChainsProducts(
-  _query: Record<string, unknown> = {}
-): Promise<StorefrontProduct[]> {
-  const items = await chainsGet<ChainsMenuItem[]>('/pos/public/menu', {
-    revalidate: 120,
-    tags:       ['chains-menu'],
-  });
-  return items.map((item) => ({
+// The public menu endpoint doesn't repeat the currency per item, so we stamp
+// each product with the store's currency (cached store-info call) — this is what
+// makes product cards show KES instead of the formatter's fallback.
+async function storeCurrency(): Promise<string | undefined> {
+  try {
+    const info = await chainsGet<ChainsStoreInfo>('/pos/public/store', { revalidate: 300, tags: ['chains-store-info'] });
+    return info.currency ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function mapMenuItem(item: ChainsMenuItem, currency?: string): StorefrontProduct {
+  return {
     id:                item.id,
     name:              item.name,
     description:       item.description ?? undefined,
     price:             item.price,
-    sale_price:        null,
-    currency:          undefined,
+    sale_price:        item.onSale && item.salePrice != null ? item.salePrice : null,
+    currency:          currency,
     is_available:      item.isActive && (item.stock == null || item.stock > 0),
-    is_on_sale:        false,
+    is_on_sale:        !!item.onSale && item.salePrice != null,
     is_recommended:    false,
     is_service:        false,
     is_bookable:       false,
     primary_image_url: resolveImageUrl(item.imageUrl),
     slug:              item.id,
     meta: {
-      categoryId:   item.categoryId,
-      categoryName: item.categoryName,
-      stock:        item.stock,
+      categoryId:      item.categoryId,
+      categoryName:    item.categoryName,
+      subcategoryId:   item.subcategoryId ?? null,
+      subcategoryName: item.subcategoryName ?? null,
+      stock:           item.stock,
     },
-  }));
+  };
+}
+
+export async function getChainsProducts(
+  query: Record<string, unknown> = {}
+): Promise<StorefrontProduct[]> {
+  const params = new URLSearchParams();
+  if (query.limit != null) params.set('limit', String(query.limit));
+  // No `page` → backend returns a bare (optionally filtered) array, as before.
+  const suffix = params.toString() ? `?${params}` : '';
+  const [items, currency] = await Promise.all([
+    chainsGet<ChainsMenuItem[]>(`/pos/public/menu${suffix}`, { revalidate: 120, tags: ['chains-menu'] }),
+    storeCurrency(),
+  ]);
+  const mapped = (Array.isArray(items) ? items : []).map((i) => mapMenuItem(i, currency));
+  // Honour a client-side limit even though the backend array is unpaginated.
+  return query.limit != null ? mapped.slice(0, Number(query.limit)) : mapped;
+}
+
+// ─── Paginated browse (→ ProductPage) ─────────────────────────────────────────
+
+export async function getChainsBrowse(opts: {
+  category?: string;
+  subcategory?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<ProductPage> {
+  const params = new URLSearchParams();
+  if (opts.category)    params.set('category', opts.category);
+  if (opts.subcategory) params.set('subcategory', opts.subcategory);
+  if (opts.q)           params.set('q', opts.q);
+  params.set('page',  String(opts.page ?? 1));
+  params.set('limit', String(opts.limit ?? 24));
+  const [data, currency] = await Promise.all([
+    chainsGet<{ items: ChainsMenuItem[]; total: number; page: number; pageSize: number }>(
+      `/pos/public/menu?${params}`,
+      { revalidate: 60, tags: ['chains-menu'] }
+    ),
+    storeCurrency(),
+  ]);
+  return {
+    products: (data.items ?? []).map((i) => mapMenuItem(i, currency)),
+    total:    data.total ?? 0,
+    page:     data.page ?? 1,
+    pageSize: data.pageSize ?? 24,
+  };
+}
+
+// ─── Category tree (main + sub) ───────────────────────────────────────────────
+
+export async function getChainsCategoryTree(): Promise<CategoryNode[]> {
+  const nodes = await chainsGet<CategoryNode[]>('/pos/public/categories', {
+    revalidate: 300,
+    tags:       ['chains-categories'],
+  }).catch(() => [] as CategoryNode[]);
+  return Array.isArray(nodes) ? nodes : [];
 }
 
 // ─── Categories (derived from menu items) ────────────────────────────────────
@@ -114,23 +180,76 @@ export async function getChainsProduct(id: string): Promise<StorefrontProduct | 
 export async function getChainsSearchProducts(query: string): Promise<StorefrontProduct[]> {
   const items = await getChainsProducts();
   const q = query.toLowerCase();
-  return items.filter(
-    (p) => p.name.toLowerCase().includes(q) || (p.description ?? '').toLowerCase().includes(q)
-  );
+  return items.filter((p) => {
+    const categoryName = String((p.meta as { categoryName?: string | null } | undefined)?.categoryName ?? '');
+    return (
+      p.name.toLowerCase().includes(q) ||
+      (p.description ?? '').toLowerCase().includes(q) ||
+      categoryName.toLowerCase().includes(q)
+    );
+  });
 }
 
 export async function getChainsNetworkStores(): Promise<NetworkStore[]> { return []; }
 
 // ─── Gateways — return M-Pesa so checkout shows M-Pesa flow ──────────────────
 
+// ─── Payment methods ──────────────────────────────────────────────────────────
+// Resolution order:
+//   1. NEXT_PUBLIC_PAYMENT_METHODS env (comma list) — authoritative per instance.
+//   2. else derived from the store's POS settings (org.settings).
+// Cash is ALWAYS opt-in (off by default): only shown if listed in the env, or
+// (when no env list) if NEXT_PUBLIC_ENABLE_CASH=true.
+// The backend routes each method: own M-Pesa creds → their till; bank / till-less
+// M-Pesa → the platform treasury for settlement.
+type PayMethod = 'mpesa' | 'bank' | 'cash' | 'bitcoin' | 'card';
+
+const METHOD_LABELS: Record<PayMethod, string> = {
+  mpesa: 'M-Pesa',
+  bank: 'Bank transfer',
+  cash: 'Cash on delivery / pickup',
+  bitcoin: 'Bitcoin',
+  card: 'Card',
+};
+
+function envPaymentMethods(): PayMethod[] | null {
+  const raw = process.env.NEXT_PUBLIC_PAYMENT_METHODS?.trim();
+  if (!raw) return null;
+  return raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((m): m is PayMethod => m in METHOD_LABELS);
+}
+
 export async function getChainsGateways(): Promise<PaymentGateway[]> {
-  try {
-    const data = await chainsGet<ChainsStoreInfo>('/pos/public/store', { revalidate: 300 });
-    if (data.mpesa?.enabled) {
-      return [{ id: 'mpesa', code: 'mpesa', name: 'M-Pesa' }];
-    }
-  } catch { /* fall through */ }
-  return [];
+  const env = envPaymentMethods();
+  let methods: PayMethod[] = [];
+
+  if (env) {
+    methods = [...env];
+  } else {
+    try {
+      const data = await chainsGet<ChainsStoreInfo>('/pos/public/store', { revalidate: 300, tags: ['chains-store-info'] });
+      const modes = (data.paymentModes ?? []).map(String);
+      if (data.mpesa?.enabled || modes.includes('platform_stk') || modes.includes('business_till')) methods.push('mpesa');
+      if (data.bitcoin?.enabled || modes.includes('bitcoin')) methods.push('bitcoin');
+      if (modes.includes('card')) methods.push('card');
+      if (modes.includes('bank')) methods.push('bank');
+      if (modes.includes('cash')) methods.push('cash');
+    } catch { /* fall through to default */ }
+  }
+
+  // Cash is off by default — keep it only when explicitly enabled.
+  const cashOn = env ? env.includes('cash') : process.env.NEXT_PUBLIC_ENABLE_CASH === 'true';
+  methods = methods.filter((m) => m !== 'cash');
+  if (cashOn) methods.push('cash');
+
+  // De-dupe, preserve order; never return empty (default to M-Pesa).
+  const seen = new Set<PayMethod>();
+  const out = methods
+    .filter((m) => (seen.has(m) ? false : (seen.add(m), true)))
+    .map((m) => ({ id: m, code: m, name: METHOD_LABELS[m] }));
+  return out.length ? out : [{ id: 'mpesa', code: 'mpesa', name: METHOD_LABELS.mpesa }];
 }
 
 // ─── Cart ─────────────────────────────────────────────────────────────────────
@@ -194,7 +313,7 @@ export async function getChainsCustomerProfile(customerToken: string): Promise<C
 
 export async function getChainsUpdateCustomer(
   customerToken: string,
-  body: { name?: string; address?: Record<string, unknown> }
+  body: { name?: string; address?: Record<string, unknown>; mpesaNumber?: string | null }
 ): Promise<Customer | null> {
   return chainsPatch<Customer>('/pos/public/auth/me', body, { customerToken }).catch(() => null);
 }
@@ -207,6 +326,7 @@ type ChainsOrderResult = {
   paymentStatus: string;
   total: number;
   currency: string;
+  payment?: Record<string, unknown>;
 };
 
 export async function getChainsPlaceOrder(
@@ -232,6 +352,7 @@ export async function getChainsPlaceOrder(
       orderStatus:   res.status,
       total:         res.total,
       currency:      res.currency,
+      payment:       res.payment ?? null,
     },
   };
 }
@@ -240,10 +361,16 @@ type ChainsOrderStatus = {
   id: string;
   status: string;
   paymentStatus: string;
+  stage?: string;
+  posStatus?: string | null;
+  paymentMethod?: string | null;
   total: number;
   currency: string;
   items: unknown[];
   mpesaRef: string | null;
+  paymentRef?: string | null;
+  reference?: string | null;
+  virtualAccount?: Record<string, unknown> | null;
   updatedAt: string;
 };
 
@@ -252,7 +379,7 @@ export async function getChainsOrderStatus(orderId: string): Promise<ChainsOrder
 }
 
 export async function getChainsCustomerOrders(customerToken: string): Promise<Order[]> {
-  const res = await chainsGet<Array<{ id: string; status: string; paymentStatus: string; total: number; currency: string; createdAt: string }>>(
+  const res = await chainsGet<Array<{ id: string; status: string; paymentStatus: string; paymentMethod?: string | null; total: number; currency: string; isPickup?: boolean; createdAt: string; items?: Array<{ name?: string; qty?: number; price?: number }> }>>(
     '/pos/public/orders',
     { revalidate: 0, customerToken }
   ).catch(() => []);
@@ -260,7 +387,15 @@ export async function getChainsCustomerOrders(customerToken: string): Promise<Or
     id:         o.id,
     status:     o.paymentStatus === 'paid' ? 'paid' : o.status,
     created_at: o.createdAt,
-    meta: { paymentStatus: o.paymentStatus, orderStatus: o.status, total: o.total, currency: o.currency },
+    meta: {
+      paymentStatus: o.paymentStatus,
+      orderStatus:   o.status,
+      paymentMethod: o.paymentMethod ?? null,
+      total:         o.total,
+      currency:      o.currency,
+      isPickup:      o.isPickup,
+      items:         o.items ?? [],
+    },
   }));
 }
 

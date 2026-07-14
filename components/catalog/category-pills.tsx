@@ -9,7 +9,7 @@ export function CategoryPills({ categories }: { categories: StorefrontCategory[]
   return (
     <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '6px 0 16px' }}>
       {categories.map((category) => (
-        <Link key={category.id} className="button secondary" href={`/search?tag=${encodeURIComponent(category.name)}`}>
+        <Link key={category.id} className="button secondary" href={`/search?category=${encodeURIComponent(category.id)}`}>
           {category.name}
         </Link>
       ))}

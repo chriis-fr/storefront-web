@@ -29,9 +29,13 @@ export type ChainsMenuItem = {
   name: string;
   description: string | null;
   price: number;
+  salePrice?: number | null;
+  onSale?: boolean;
   imageUrl: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  subcategoryId?: string | null;
+  subcategoryName?: string | null;
   isActive: boolean;
   stock: number | null;
 };

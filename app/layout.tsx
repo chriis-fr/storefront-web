@@ -1,12 +1,27 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import config from '@/storefront.config';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { ThemeScript } from '@/components/theme-script';
-import { getStorefrontAbout } from '@/lib/provider';
-import { getThemeCssVariables } from '@/lib/theme';
+import { PwaRegister } from '@/components/pwa-register';
+import { getStorefrontAbout, getNetworkStores } from '@/lib/provider';
+import { resolveStoreLogo } from '@/lib/hero';
 import { PluginProvider } from '@/plugins/provider';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Matches the theme background so the status bar / PWA chrome blends in (both modes).
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c0a09' },
+  ],
+};
+
+// Match the POS app's typeface.
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' });
 
 export async function generateMetadata(): Promise<Metadata> {
   const about = await getStorefrontAbout().catch(() => null);
@@ -20,6 +35,13 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description,
     metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+    applicationName: title,
+    manifest: '/manifest.webmanifest',
+    appleWebApp: { capable: true, statusBarStyle: 'default', title },
+    icons: {
+      icon: [{ url: '/chains.svg', type: 'image/svg+xml' }],
+      apple: [{ url: '/chainsnobg.png' }],
+    },
     openGraph: {
       title,
       description,
@@ -29,19 +51,22 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const about = await getStorefrontAbout().catch(() => null);
+  const [about, stores] = await Promise.all([
+    getStorefrontAbout().catch(() => null),
+    getNetworkStores().catch(() => []),
+  ]);
+  // A store brand colour overrides the primary in both light and dark; base
+  // tokens live in globals.css so dark mode can take effect.
   const brandColor = typeof about?.options?.brandColor === 'string' ? about.options.brandColor : null;
-  const themeCss = {
-    ...getThemeCssVariables(config.defaultTheme),
-    ...(brandColor ? { '--primary': brandColor } : {}),
-  } as React.CSSProperties;
+  const bodyStyle = (brandColor ? { ['--primary']: brandColor } : undefined) as React.CSSProperties | undefined;
 
   return (
-    <html lang={config.defaultLocale}>
-      <body style={themeCss}>
+    <html lang={config.defaultLocale} className={inter.variable} suppressHydrationWarning>
+      <body style={bodyStyle}>
         <ThemeScript />
+        <PwaRegister />
         <PluginProvider>
-          <Header about={about} />
+          <Header about={about} stores={stores} logo={resolveStoreLogo(about)} />
           <main>{children}</main>
           <Footer about={about} />
         </PluginProvider>

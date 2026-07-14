@@ -4,7 +4,7 @@ import { promoBannerPlugin } from './plugins/promo-banner';
 import { stripePlugin } from './plugins/stripe';
 
 const config: StorefrontWebConfig = {
-  name: 'Fleetbase Storefront Web',
+  name: 'Chains-ERP Storefront Web',
   defaultLocale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE ?? 'en',
   defaultTheme: process.env.NEXT_PUBLIC_DEFAULT_THEME ?? 'default',
   routes: {

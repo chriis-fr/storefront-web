@@ -26,6 +26,22 @@ export type StorefrontCategory = {
   products?: StorefrontProduct[];
 };
 
+// A node in the POS category tree (main category or its subcategory).
+export type CategoryNode = {
+  id: string;
+  name: string;
+  type: 'main' | 'sub';
+  parentId: string | null;
+};
+
+// One page of a paginated product browse.
+export type ProductPage = {
+  products: StorefrontProduct[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type StorefrontProduct = {
   id: string;
   name: string;

@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Check } from 'lucide-react';
 import type { ProductAddon, ProductVariantOption, StorefrontProduct } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
 
@@ -11,7 +12,8 @@ export function AddToCartForm({ product }: { product: StorefrontProduct }) {
   const [quantity, setQuantity] = useState(1);
   const [variants, setVariants] = useState<SelectionState>({});
   const [addons, setAddons] = useState<SelectionState>({});
-  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const optionTotal = useMemo(() => {
@@ -41,7 +43,7 @@ export function AddToCartForm({ product }: { product: StorefrontProduct }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
-    setStatus(null);
+    setError(null);
 
     try {
       const response = await fetch('/api/storefront/cart/items', {
@@ -60,16 +62,19 @@ export function AddToCartForm({ product }: { product: StorefrontProduct }) {
         throw new Error(payload.error ?? 'Unable to add this product to cart.');
       }
 
-      setStatus('Added to cart.');
+      setAdded(true);
+      // Tell the header cart badge to refresh immediately.
+      window.dispatchEvent(new Event('cart:updated'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to add this product to cart.');
+      setAdded(false);
+      setError(error instanceof Error ? error.message : 'Unable to add this product to cart.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={submit} className="stack" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16, background: '#fff' }}>
+    <form onSubmit={submit} className="stack" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16, background: 'var(--surface)' }}>
       {product.variants?.map((variant) => (
         <label key={variant.id} className="stack" style={{ gap: 8 }}>
           <strong>{variant.name}</strong>
@@ -102,14 +107,33 @@ export function AddToCartForm({ product }: { product: StorefrontProduct }) {
           </div>
         </fieldset>
       ))}
-      <label className="stack" style={{ gap: 8 }}>
+      <div className="stack" style={{ gap: 8 }}>
         <strong>Quantity</strong>
-        <input className="field" type="number" min={1} value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} />
-      </label>
-      <button className="button" disabled={loading || product.is_available === false}>
-        <ShoppingCart size={18} /> {loading ? 'Adding...' : `Add ${formatMoney(optionTotal, product.currency)}`}
+        <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 'var(--radius)', width: 'max-content', overflow: 'hidden', background: 'var(--background)' }}>
+          <button type="button" aria-label="Decrease quantity" onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+            style={{ minWidth: 44, height: 42, border: 'none', background: 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'inherit' }}>
+            <Minus size={16} />
+          </button>
+          <span style={{ minWidth: 44, textAlign: 'center', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quantity}</span>
+          <button type="button" aria-label="Increase quantity" onClick={() => setQuantity((q) => q + 1)}
+            style={{ minWidth: 44, height: 42, border: 'none', background: 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'inherit' }}>
+            <Plus size={16} />
+          </button>
+        </div>
+      </div>
+
+      <button className="button" disabled={loading || product.is_available === false} style={{ height: 48, fontSize: '1rem' }}>
+        <ShoppingCart size={18} />
+        {product.is_available === false ? 'Out of stock' : loading ? 'Adding…' : `Add to cart · ${formatMoney(optionTotal, product.currency)}`}
       </button>
-      {status && <p className="muted" role="status">{status}</p>}
+
+      {added && (
+        <p role="status" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--success)', fontWeight: 600 }}>
+          <Check size={16} /> Added to cart
+          <Link href="/cart" style={{ color: 'var(--primary)', marginLeft: 'auto' }}>View cart →</Link>
+        </p>
+      )}
+      {error && <p role="status" style={{ margin: 0, color: 'var(--error)' }}>{error}</p>}
     </form>
   );
 }

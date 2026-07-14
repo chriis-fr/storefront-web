@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { getProducts } from '@/lib/provider';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3002';
   const products = await getProducts({ limit: 100 }).catch(() => []);
 
   return [

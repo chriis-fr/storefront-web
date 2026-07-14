@@ -12,7 +12,7 @@ export default async function StoresPage() {
       <div className="section-title">
         <div>
           <h1>{about?.is_network ? 'Marketplace stores' : 'Stores'}</h1>
-          <p className="muted">Browse storefronts available in this Fleetbase Storefront network.</p>
+          <p className="muted">Browse storefronts available in this Chains-ERP network.</p>
         </div>
       </div>
       <StoreDirectory stores={stores} />

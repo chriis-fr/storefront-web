@@ -1,18 +1,39 @@
+/* Palette matched to the Chains POS app: Inter, a vibrant green primary,
+   neutral zinc greys, generous rounding — in both light and dark. */
 :root {
   --background: #ffffff;
-  --surface: #f7f8fb;
-  --surface-strong: #eef1f6;
-  --text: #14171f;
-  --muted: #687084;
-  --border: #dfe3eb;
-  --primary: #0f766e;
+  --surface: #f4f4f5;
+  --surface-strong: #e9e9ec;
+  --text: #0a0a0b;
+  --muted: #71717a;
+  --border: #e4e4e7;
+  --primary: #16a34a;
   --primary-contrast: #ffffff;
   --accent: #f59e0b;
-  --success: #15803d;
+  --success: #16a34a;
   --warning: #b45309;
-  --error: #b91c1c;
-  --radius: 8px;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --error: #dc2626;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+html.dark {
+  --background: #0c0a09;
+  --surface: #1c1917;
+  --surface-strong: #292524;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --border: #27272a;
+  --primary: #22c55e;
+  --primary-contrast: #04210f;
+  --accent: #fbbf24;
+  --success: #22c55e;
+  --warning: #d97706;
+  --error: #ef4444;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
 }
 
 * {
@@ -20,14 +41,21 @@
 }
 
 html {
-  color-scheme: light;
   font-family: var(--font-sans);
 }
 
+/* Anchor the footer to the bottom on short pages. */
 body {
   margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--background);
   color: var(--text);
+}
+
+body > main {
+  flex: 1 0 auto;
 }
 
 a {
@@ -71,6 +99,12 @@ img {
   color: var(--primary-contrast);
   padding: 0 14px;
   font-weight: 650;
+  box-shadow: var(--shadow);
+  transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.button:hover {
+  filter: brightness(0.96);
 }
 
 .button.secondary {
@@ -79,10 +113,19 @@ img {
   color: var(--text);
 }
 
+.button.secondary:hover {
+  background: var(--surface-strong);
+}
+
 .button.ghost {
   border-color: transparent;
   background: transparent;
   color: var(--text);
+  box-shadow: none;
+}
+
+.button.ghost:hover {
+  background: var(--surface);
 }
 
 .field {
@@ -90,9 +133,15 @@ img {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--background);
   color: var(--text);
   padding: 0 12px;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .stack {
@@ -137,4 +186,84 @@ img {
   .two-column {
     grid-template-columns: 1fr;
   }
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+.site-header__bar {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.site-header__search {
+  flex: 1;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.site-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.site-header__mobile {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ─── Hero ────────────────────────────────────────────────────────────────── */
+.hero-inner {
+  min-height: 340px;
+  padding: 48px 0;
+}
+
+/* ─── Responsive breakpoints ──────────────────────────────────────────────── */
+
+/* Tablet & down: collapse the header nav into a menu, search drops full-width */
+@media (max-width: 760px) {
+  .site-header__bar {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    min-height: 0;
+    padding: 12px 0;
+  }
+  .site-header__nav { display: none; }
+  .site-header__mobile { display: flex; }
+  .site-header__search {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+/* Phones: stack section headers, shrink the hero */
+@media (max-width: 640px) {
+  .section-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .hero-inner {
+    min-height: 210px;
+    padding: 28px 0;
+  }
+}
+
+/* Small phones: two product columns rather than one giant one */
+@media (max-width: 520px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

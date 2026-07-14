@@ -16,6 +16,8 @@ import type {
   StorefrontAbout,
   StorefrontCategory,
   StorefrontProduct,
+  CategoryNode,
+  ProductPage,
 } from '@/lib/types';
 
 import * as fleetbase from './fleetbase/storefront';
@@ -49,6 +51,28 @@ export async function getCategories(query: Record<string, unknown> = {}): Promis
 export async function searchProducts(query: string, _options: Record<string, unknown> = {}): Promise<StorefrontProduct[]> {
   if (USE_CHAINS) return chains.getChainsSearchProducts(query);
   return fleetbase.searchProducts(query, _options);
+}
+
+// Paginated, filterable browse — the storefront browse hub. Falls back to a
+// single-page slice over the Fleetbase list when chains mode is off.
+export async function browseProducts(opts: {
+  category?: string;
+  subcategory?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<ProductPage> {
+  if (USE_CHAINS) return chains.getChainsBrowse(opts);
+  const all = await fleetbase.getProducts({}).catch(() => [] as StorefrontProduct[]);
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = opts.limit ?? 24;
+  return { products: all.slice((page - 1) * pageSize, page * pageSize), total: all.length, page, pageSize };
+}
+
+// The POS category tree (main + sub) for filter UIs. Empty in Fleetbase mode.
+export async function getCategoryTree(): Promise<CategoryNode[]> {
+  if (USE_CHAINS) return chains.getChainsCategoryTree();
+  return [];
 }
 
 export async function getNetworkStores(): Promise<NetworkStore[]> {
@@ -114,7 +138,7 @@ export async function getCustomerProfile(customerToken: string): Promise<Custome
 
 export async function updateCustomer(
   customerToken: string,
-  body: { name?: string; address?: Record<string, unknown> }
+  body: { name?: string; address?: Record<string, unknown>; mpesaNumber?: string | null }
 ): Promise<Customer | null> {
   if (USE_CHAINS) return chains.getChainsUpdateCustomer(customerToken, body);
   return null;

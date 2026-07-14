@@ -23,9 +23,9 @@ export default async function HomePage() {
             <h1>{about?.is_network ? 'Explore the marketplace' : 'Shop products'}</h1>
             <p className="muted">Browse products, services, and local delivery options.</p>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 280 }}>
-            <Search size={18} />
-            <input className="field" name="q" placeholder="Search products" />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 360, minWidth: 0 }}>
+            <Search size={18} style={{ flexShrink: 0 }} />
+            <input className="field" name="q" placeholder="Search products" style={{ flex: 1, minWidth: 0 }} />
           </label>
         </form>
         <CategoryPills categories={categories} />
