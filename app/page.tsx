@@ -13,6 +13,7 @@ export default async function HomePage() {
     getProducts({ limit: 16 }).catch(() => []),
     getNetworkStores().catch(() => [])
   ]);
+  
 
   return (
     <>
