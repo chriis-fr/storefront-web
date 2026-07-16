@@ -108,7 +108,7 @@ export function CheckoutPageClient() {
 
     fetch('/api/storefront/cart').then((r) => r.json()).then((d) => setCart(d.cart ?? null)).catch(() => {});
 
-    if (!gwCached || cacheAgeMs('gateways') > 30 * 60_000) {
+    if (!gwCached || cacheAgeMs('gateways') > 5 * 60_000) {
       fetch('/api/storefront/gateways').then((r) => r.json())
         .then((d) => { const gws: PaymentGateway[] = d.gateways ?? []; applyGateways(gws); cacheSet('gateways', gws); })
         .catch(() => {});
@@ -167,7 +167,11 @@ export function CheckoutPageClient() {
       if (!res.ok) throw new Error(data.error ?? 'Unable to place order.');
       setOrder(data.order);
       window.dispatchEvent(new Event('cart:updated')); // cart cleared server-side
-      cacheClear('orders'); cacheClear('auth-me'); // new order + updated payment profile
+      cacheClear('orders'); cacheClear('auth-me'); // force fresh profile on next load
+      // If the customer confirmed their age in this session, hide the checkbox now
+      // without waiting for the /me refetch. The server also persists ageConfirmed
+      // on the customer document, so it won't reappear on future visits either.
+      if (age) setAgeOnFile(true);
       if (isMpesa) {
         setPolling(true);
         savePendingOrder(data.order, gateway); // survive a refresh while awaiting payment
@@ -176,6 +180,22 @@ export function CheckoutPageClient() {
         setPolling(true); // wait for the bank transfer to land
         savePendingOrder(data.order, gateway); // survive a refresh while awaiting payment
         setStatus('Order placed. Complete the bank transfer using the details below.');
+      } else if (gateway === 'card') {
+        // Card → Paystack: hand off to the hosted checkout, then poll on return.
+        const pay = (data.order?.meta as { payment?: { via?: string; email?: string; amount?: number } } | undefined)?.payment;
+        if (pay?.via === 'paystack') {
+          setPolling(true);
+          savePendingOrder(data.order, gateway); // Paystack redirects back to /checkout
+          setStatus('Redirecting to secure card payment…');
+          const init = await fetch('/api/storefront/paystack/init', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: data.order.id, amount: pay.amount, email: pay.email }),
+          }).then((r) => r.json()).catch(() => null);
+          if (init?.authorization_url) { window.location.href = init.authorization_url; return; }
+          setStatus('Card payment is unavailable right now. Please choose another method.');
+        } else {
+          setStatus('Order placed.');
+        }
       } else {
         setStatus('Order placed.');
       }
@@ -317,6 +337,41 @@ export function CheckoutPageClient() {
           <>
             <p className="muted">Your order is placed. {status ?? 'The store will confirm your payment shortly.'}</p>
             <Link className="button" href="/orders" style={{ display: 'inline-block', marginTop: 24 }}>View my orders</Link>
+          </>
+        )}
+      </section>
+    );
+  }
+
+  // ── Card (Paystack) — awaiting confirmation / result ──
+  if (order && placedMethod === 'card') {
+    const paid = orderStatus?.paymentStatus === 'paid';
+    const failed = orderStatus?.status === 'cancelled' || orderStatus?.paymentStatus === 'failed';
+    return (
+      <section className="container" style={{ padding: '48px 0', maxWidth: 520 }}>
+        <h1>{paid ? 'Payment received' : failed ? 'Payment failed' : 'Awaiting card payment'}</h1>
+        {paid ? (
+          <>
+            <p className="muted">Your order has been confirmed.</p>
+            {orderStatus?.paymentRef && <p style={{ fontFamily: 'monospace', marginTop: 8 }}>Ref: <strong>{orderStatus.paymentRef}</strong></p>}
+            <Link className="button" href="/orders" style={{ display: 'inline-block', marginTop: 24 }}>View my orders</Link>
+          </>
+        ) : failed ? (
+          <>
+            <p className="muted">The card payment didn’t complete. Your reserved stock has been released.</p>
+            <Link className="button secondary" href="/checkout" style={{ display: 'inline-block', marginTop: 16 }}>Try again</Link>
+          </>
+        ) : (
+          <>
+            <p className="muted">{status ?? 'Complete your card payment in the secure Paystack window.'}</p>
+            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 20, margin: '24px 0' }}>
+              <p style={{ marginBottom: 8 }}><strong>Order total:</strong> {formatMoney(placedTotal, placedCurrency)}</p>
+              <p style={{ marginBottom: 8 }}><strong>Reference:</strong> <span style={{ fontFamily: 'monospace' }}>{order.id}</span></p>
+            </div>
+            <p className="muted" style={{ fontSize: 13 }}>
+              <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: 'var(--primary, #4CAF50)', marginRight: 6, animation: 'pulse 1.5s infinite' }} />
+              Waiting for payment confirmation…
+            </p>
           </>
         )}
       </section>

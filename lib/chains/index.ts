@@ -19,6 +19,7 @@ import type {
 } from '@/lib/types';
 import type { ChainsMenuItem, ChainsStoreInfo } from '@/lib/storefront-provider';
 import { chainsGet, chainsPost, chainsPut, chainsDelete, chainsPatch } from './client';
+import storefrontConfig from '@/storefront.config';
 
 // ─── Image URL helper ─────────────────────────────────────────────────────────
 
@@ -192,63 +193,25 @@ export async function getChainsSearchProducts(query: string): Promise<Storefront
 
 export async function getChainsNetworkStores(): Promise<NetworkStore[]> { return []; }
 
-// ─── Gateways — return M-Pesa so checkout shows M-Pesa flow ──────────────────
+// ─── Gateways ─────────────────────────────────────────────────────────────────
 
-// ─── Payment methods ──────────────────────────────────────────────────────────
-// Resolution order:
-//   1. NEXT_PUBLIC_PAYMENT_METHODS env (comma list) — authoritative per instance.
-//   2. else derived from the store's POS settings (org.settings).
-// Cash is ALWAYS opt-in (off by default): only shown if listed in the env, or
-// (when no env list) if NEXT_PUBLIC_ENABLE_CASH=true.
-// The backend routes each method: own M-Pesa creds → their till; bank / till-less
-// M-Pesa → the platform treasury for settlement.
 type PayMethod = 'mpesa' | 'bank' | 'cash' | 'bitcoin' | 'card';
 
 const METHOD_LABELS: Record<PayMethod, string> = {
-  mpesa: 'M-Pesa',
-  bank: 'Bank transfer',
-  cash: 'Cash on delivery / pickup',
+  mpesa:   'M-Pesa',
+  bank:    'Bank transfer',
+  cash:    'Cash on delivery / pickup',
   bitcoin: 'Bitcoin',
-  card: 'Card',
+  card:    'Card',
 };
 
-function envPaymentMethods(): PayMethod[] | null {
-  const raw = process.env.NEXT_PUBLIC_PAYMENT_METHODS?.trim();
-  if (!raw) return null;
-  return raw
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter((m): m is PayMethod => m in METHOD_LABELS);
-}
-
 export async function getChainsGateways(): Promise<PaymentGateway[]> {
-  const env = envPaymentMethods();
-  let methods: PayMethod[] = [];
-
-  if (env) {
-    methods = [...env];
-  } else {
-    try {
-      const data = await chainsGet<ChainsStoreInfo>('/pos/public/store', { revalidate: 300, tags: ['chains-store-info'] });
-      const modes = (data.paymentModes ?? []).map(String);
-      if (data.mpesa?.enabled || modes.includes('platform_stk') || modes.includes('business_till')) methods.push('mpesa');
-      if (data.bitcoin?.enabled || modes.includes('bitcoin')) methods.push('bitcoin');
-      if (modes.includes('card')) methods.push('card');
-      if (modes.includes('bank')) methods.push('bank');
-      if (modes.includes('cash')) methods.push('cash');
-    } catch { /* fall through to default */ }
-  }
-
-  // Cash is off by default — keep it only when explicitly enabled.
-  const cashOn = env ? env.includes('cash') : process.env.NEXT_PUBLIC_ENABLE_CASH === 'true';
-  methods = methods.filter((m) => m !== 'cash');
-  if (cashOn) methods.push('cash');
-
-  // De-dupe, preserve order; never return empty (default to M-Pesa).
-  const seen = new Set<PayMethod>();
-  const out = methods
-    .filter((m) => (seen.has(m) ? false : (seen.add(m), true)))
-    .map((m) => ({ id: m, code: m, name: METHOD_LABELS[m] }));
+  // Payment methods are configured in storefront.config.ts — edit paymentMethods
+  // there to enable or disable methods. Display order follows the array below.
+  const pm = storefrontConfig.paymentMethods;
+  const ordered: PayMethod[] = ['mpesa', 'bank', 'card', 'cash', 'bitcoin'];
+  const methods = ordered.filter((m) => pm[m]);
+  const out = methods.map((m) => ({ id: m, code: m, name: METHOD_LABELS[m] }));
   return out.length ? out : [{ id: 'mpesa', code: 'mpesa', name: METHOD_LABELS.mpesa }];
 }
 

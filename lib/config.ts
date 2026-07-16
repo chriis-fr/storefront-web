@@ -21,6 +21,13 @@ export type StorefrontWebConfig = {
     orderHistory: boolean;
     marketplace: boolean;
   };
+  paymentMethods: {
+    mpesa:   boolean;
+    bank:    boolean;
+    card:    boolean;
+    cash:    boolean;
+    bitcoin: boolean;
+  };
   plugins: StorefrontPlugin[];
 };
 

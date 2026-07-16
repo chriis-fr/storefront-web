@@ -60,6 +60,8 @@ export function AccountPageClient() {
   const [savingMpesa, setSavingMpesa] = useState(false);
   const [newAddr, setNewAddr] = useState<AddressValue>({ text: '' });
   const [savingAddr, setSavingAddr] = useState(false);
+  const [removingAddr, setRemovingAddr] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   // Update state + cache together so a reload / other page reuses it (no refetch).
   const persistCustomer = (next: Customer | null) => {
@@ -94,10 +96,13 @@ export function AccountPageClient() {
   }
 
   async function removeAddress(id: string) {
+    setRemovingAddr(id);
     try {
       await patchAddresses({ removeAddressId: id }, 'Address removed.');
     } catch (err) {
       setStatus({ ok: false, message: err instanceof Error ? err.message : 'Could not remove address.' });
+    } finally {
+      setRemovingAddr(null);
     }
   }
 
@@ -232,10 +237,12 @@ export function AccountPageClient() {
   }
 
   async function handleSignOut() {
+    setSigningOut(true);
     await fetch('/api/storefront/auth/logout', { method: 'POST' });
     persistCustomer(null);           // clears the cached profile
     cacheClear(ORDERS_KEY);
     setStatus({ ok: true, message: 'Signed out.' });
+    // component unmounts/re-renders to login view so no need to reset signingOut
   }
 
   if (checking) {
@@ -262,7 +269,7 @@ export function AccountPageClient() {
             <h1>My account</h1>
             <p className="muted">{customer.name || customer.email || customer.phone}</p>
           </div>
-          <button className="button secondary" onClick={handleSignOut}>Sign out</button>
+          <button className="button secondary" onClick={handleSignOut} disabled={signingOut}>{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
 
         {/* Tabs */}
@@ -312,7 +319,9 @@ export function AccountPageClient() {
                     <div key={id ?? i} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                       <span>{addrText(a)}</span>
                       {id && (
-                        <button type="button" className="button ghost" style={{ minHeight: 30, padding: '0 8px', fontSize: 13, color: 'var(--error)' }} onClick={() => removeAddress(id)}>Remove</button>
+                        <button type="button" className="button ghost" style={{ minHeight: 30, padding: '0 8px', fontSize: 13, color: 'var(--error)' }} onClick={() => removeAddress(id)} disabled={removingAddr === id}>
+                          {removingAddr === id ? 'Removing…' : 'Remove'}
+                        </button>
                       )}
                     </div>
                   );

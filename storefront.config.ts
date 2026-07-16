@@ -21,7 +21,14 @@ const config: StorefrontWebConfig = {
     delivery: true,
     tips: true,
     orderHistory: true,
-    marketplace: true
+    marketplace: true,
+  },
+  paymentMethods: {
+    mpesa:   true,
+    bank:    false,
+    card:    false,
+    cash:    false,
+    bitcoin: false,
   },
   plugins: [stripePlugin, promoBannerPlugin, analyticsPlugin]
 };
