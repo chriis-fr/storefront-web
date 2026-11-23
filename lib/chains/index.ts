@@ -249,6 +249,13 @@ export async function getChainsEmptyCart(cartId: string): Promise<Cart | null> {
   return chainsDelete<Cart>('/pos/public/cart', { cartId }).catch(() => null);
 }
 
+/** What an unpaid order costs, from chains-api (never from the browser). */
+export async function chainsOrderPayable(orderId: string): Promise<{ amountMinor: number; currency: string; payable: boolean } | null> {
+  return chainsGet<{ amountMinor: number; currency: string; payable: boolean }>(
+    `/pos/public/orders/${encodeURIComponent(orderId)}/payable`, { revalidate: 0 },
+  ).catch(() => null);
+}
+
 // ─── Customer auth ────────────────────────────────────────────────────────────
 
 export async function getChainsRegisterCustomer(body: {

@@ -40,7 +40,7 @@ export async function chainsGet<T>(path: string, opts: ChainsGetOptions = {}): P
   });
 
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`), { status: res.status });
   return body as T;
 }
 
@@ -60,7 +60,7 @@ export async function chainsPost<T>(
   });
 
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`), { status: res.status });
   return body as T;
 }
 
@@ -80,7 +80,7 @@ export async function chainsPut<T>(
   });
 
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`), { status: res.status });
   return body as T;
 }
 
@@ -100,7 +100,7 @@ export async function chainsDelete<T>(
   });
 
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`), { status: res.status });
   return body as T;
 }
 
@@ -120,7 +120,7 @@ export async function chainsPatch<T>(
   });
 
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(body?.error ?? body?.message ?? `chains-api ${res.status}`), { status: res.status });
   return body as T;
 }
 

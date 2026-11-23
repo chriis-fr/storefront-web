@@ -27,23 +27,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
-  const event = JSON.parse(raw) as {
+  let event: {
     event?: string;
-    data?: { reference?: string; amount?: number; status?: string; id?: number | string };
+    data?: { reference?: string; amount?: number; currency?: string; status?: string; id?: number | string };
   };
+  try { event = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Bad payload' }, { status: 400 }); }
 
   // Only a confirmed successful charge settles the order.
   if (event.event === 'charge.success' && event.data?.status === 'success') {
     const orderId = event.data.reference;          // we set reference = orderId at init
     if (orderId) {
-      await chainsPost(`/pos/public/orders/${orderId}/settle-external`, {
-        reference: String(event.data.id ?? event.data.reference),
-        method:    'card',
-        amount:    event.data.amount,               // minor units — chains-api checks it covers the total
-      }).catch(() => { /* Paystack retries on non-2xx; also reconcilable later */ });
+      try {
+        await chainsPost(`/pos/public/orders/${orderId}/settle-external`, {
+          reference: String(event.data.id ?? event.data.reference),
+          method:    'card',
+          amount:    event.data.amount,             // minor units — chains-api checks it covers the total
+          currency:  event.data.currency,           // and that it is the order's currency
+        });
+      } catch (error) {
+        const status = (error as { status?: number }).status;
+        console.error('[paystack] settle failed', orderId, status, error instanceof Error ? error.message : error);
+        // chains-api refused it on the facts (amount short, wrong currency, unknown order):
+        // a retry would get the same answer, so acknowledge it and leave it for a person.
+        if (status && status >= 400 && status < 500) return NextResponse.json({ received: true, settled: false });
+        // Outage or network error: a non-2xx makes Paystack retry, so a paid order doesn't
+        // stay unpaid. settle-external is idempotent, so a retry after success is harmless.
+        return NextResponse.json({ error: 'Settlement failed; retry' }, { status: 500 });
+      }
     }
   }
 
-  // Always 200 so Paystack doesn't retry endlessly on events we ignore.
+  // 200 for settled charges and for events we ignore, so Paystack doesn't retry those.
   return NextResponse.json({ received: true });
 }

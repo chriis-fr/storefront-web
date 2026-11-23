@@ -110,6 +110,12 @@ export async function emptyCart(cartId: string): Promise<Cart | null> {
   return (fleetbase.emptyCart(cartId) as Promise<Cart>).catch(() => null);
 }
 
+/** The order's amount for a card charge, from chains-api (Paystack init uses it). */
+export async function orderPayable(orderId: string) {
+  if (USE_CHAINS) return chains.chainsOrderPayable(orderId);
+  return null;
+}
+
 // ─── Customer auth ────────────────────────────────────────────────────────────
 
 export async function registerCustomer(body: {
